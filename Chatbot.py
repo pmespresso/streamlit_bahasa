@@ -1,26 +1,50 @@
-import openai 
+"""Python file to serve as the frontend"""
 import streamlit as st
+from streamlit_chat import message
+import faiss
+from langchain import OpenAI
+from langchain.chains import VectorDBQAWithSourcesChain
+import pickle
+from dotenv import load_dotenv
 
-with st.sidebar:
-    openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
-    
-    
-st.title("💬 Chatbot")
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+load_dotenv()
+# Load the LangChain.
+index = faiss.read_index("docs.index")
 
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+with open("faiss_store.pkl", "rb") as f:
+    store = pickle.load(f)
 
-if prompt := st.chat_input():
-    if not openai_api_key:
-        st.info("Please add your OpenAI API key to continue.")
-        st.stop()
+store.index = index
+chain = VectorDBQAWithSourcesChain.from_llm(llm=OpenAI(temperature=0), vectorstore=store)
 
-    openai.api_key = openai_api_key
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-    response = openai.ChatCompletion.create(model="gpt-3.5-turbo", messages=st.session_state.messages)
-    msg = response.choices[0].message
-    st.session_state.messages.append(msg)
-    st.chat_message("assistant").write(msg.content)
+
+# From here down is all the StreamLit UI.
+st.set_page_config(page_title="Bahasa Indonesia AI", page_icon=":robot:")
+st.header("Bahasa Indonesia AI")
+
+if "generated" not in st.session_state:
+    st.session_state["generated"] = []
+
+if "past" not in st.session_state:
+    st.session_state["past"] = []
+
+
+def get_text():
+    input_text = st.text_input("You: ", "Apa Kabar?", key="input")
+    return input_text
+
+
+user_input = get_text()
+
+if user_input:
+    result = chain({"question": user_input})
+    output = f"Answer: {result['answer']}\nSources: {result['sources']}"
+
+    st.session_state.past.append(user_input)
+    st.session_state.generated.append(output)
+
+if st.session_state["generated"]:
+
+    for i in range(len(st.session_state["generated"]) - 1, -1, -1):
+        message(st.session_state["generated"][i], key=str(i))
+        message(st.session_state["past"][i], is_user=True, key=str(i) + "_user")

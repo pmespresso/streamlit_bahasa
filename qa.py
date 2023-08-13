@@ -4,6 +4,9 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQAWithSourcesChain
 import pickle
 import argparse
+from dotenv import load_dotenv
+
+load_dotenv()
 
 parser = argparse.ArgumentParser(description='Ask a question to the Bahasa Indonesia Book.')
 parser.add_argument('question', type=str, help='The question to ask the Bahasa Indonesia Book.')
